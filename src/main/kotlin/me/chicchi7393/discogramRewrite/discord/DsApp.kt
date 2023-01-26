@@ -123,23 +123,22 @@ object DsApp {
 
         val filePath = TgApp.downloadPic(chat.photo)
         TgApp.client.send(TdApi.GetUser(chat.id)) { uname ->
+            val usernames = uname.get().usernames
+            val hasUsername = usernames != null
+
             client
                 .getChannelById(MessageChannel::class.java, settings.discord["channel_id"] as Long)!!
                 .sendMessageEmbeds(
                     generateTicketEmbed(
                         chat.title,
-                        if (uname.get().usernames.activeUsernames[0] == null) embedStrs["tgRedirectPrefixLink"]!! + chat.id.toString() else "https://${(uname.get().usernames.activeUsernames[0])}.t.me",
+                        if (!hasUsername) embedStrs["tgRedirectPrefixLink"]!! + chat.id.toString() else "https://${(usernames.activeUsernames[0])}.t.me",
                         message,
-                        idOrUser = "${chat.id}/${if (uname.get().usernames.activeUsernames[0] == null) "Nessun username" else ("@" + uname.get().usernames.activeUsernames[0])}",
+                        idOrUser = "${chat.id}/${if (!hasUsername) "Nessun username" else ("@" + usernames.activeUsernames[0])}",
                         footerStr = "${settings.discord["idPrefix"]}${dbMan.Utils().getLastUsedTicketId() + 1}"
                     )
 
-                ).addFiles(FileUpload.fromData(filePath, "pic.png")).map {
-                    val rows = generateRowsEmbedButtons(
-                        embedStrs["tgRedirectPrefixLink"]!! + chat.id.toString(),
-                        it.idLong, it.id
-                    )
-                    it.editMessageComponents(rows[0], rows[1], rows[2]).queue()
+                ).addFiles(FileUpload.fromData(filePath, "pic.png")).queue {
+                    Thread.sleep(350)
                     it.createThreadChannel(
                         "${settings.discord["idPrefix"]}${dbMan.Utils().getLastUsedTicketId() + 1}"
                     ).queue { itThread ->
@@ -153,13 +152,18 @@ object DsApp {
                             )
                         )
                     }
+                    val rows = generateRowsEmbedButtons(
+                        embedStrs["tgRedirectPrefixLink"]!! + chat.id.toString(),
+                        it.idLong, it.id
+                    )
+                    it.editMessageComponents(rows[0], rows[1], rows[2]).queue()
+
                     TgApp.alertTicket(
                         chat.title,
                         message,
                         "https://discordapp.com/channels/${settings.discord["guild_id"].toString()}/${settings.discord["channel_id"].toString()}"
                     )
                 }
-                .queue()
         }
     }
 
